@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오목 · AI 대전</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22273a;
+  --accent:#6c63ff;--accent2:#ff6b6b;
+  --text:#e8eaf0;--text2:#8892a4;
+  --board:#c8a96e;--line:#9a7520;
+  --r:12px;
+}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',system-ui,sans-serif;
+  min-height:100vh;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:16px;
+}
+
+/* ── SETUP ── */
+#setup{
+  background:var(--surface);border-radius:20px;padding:36px;
+  width:min(440px,96vw);display:flex;flex-direction:column;gap:22px;
+  box-shadow:0 20px 60px rgba(0,0,0,.45);
+}
+h1{
+  font-size:2.2rem;font-weight:800;text-align:center;
+  background:linear-gradient(135deg,var(--accent),#a78bfa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.lbl{font-size:.72rem;font-weight:600;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--text2);margin-bottom:7px}
+.opts{display:flex;gap:8px}
+.opt{
+  flex:1;padding:11px 6px;border-radius:var(--r);
+  border:2px solid var(--surface2);background:var(--surface2);
+  color:var(--text2);cursor:pointer;font-size:.88rem;font-weight:500;
+  transition:all .15s;text-align:center;
+}
+.opt:hover{border-color:var(--accent);color:var(--text)}
+.opt.on{border-color:var(--accent);background:rgba(108,99,255,.15);color:var(--text)}
+.start{
+  padding:15px;border-radius:var(--r);border:none;
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);
+  color:#fff;font-size:1.05rem;font-weight:700;cursor:pointer;
+  transition:all .15s;letter-spacing:.03em;margin-top:4px;
+}
+.start:hover{transform:translateY(-2px);box-shadow:0 8px 20px rgba(108,99,255,.4)}
+
+/* ── GAME ── */
+#game{display:none;flex-direction:column;align-items:center;gap:14px}
+
+#sbar{
+  display:flex;align-items:center;gap:12px;
+  background:var(--surface);padding:11px 18px;border-radius:var(--r);
+  width:min(624px,96vw);box-shadow:0 4px 14px rgba(0,0,0,.3);
+}
+#turn-info{display:flex;align-items:center;gap:8px;font-weight:600;font-size:.93rem;flex-shrink:0}
+.si{width:17px;height:17px;border-radius:50%;flex-shrink:0}
+.si.b{background:#1a1a1a;border:2px solid #555}
+.si.w{background:#f0f0f0;border:2px solid #999}
+#timer-wrap{display:flex;flex-direction:column;flex:1;margin-left:14px;gap:5px}
+#timer-row{display:flex;align-items:center}
+#diff-badge{font-size:.72rem;color:var(--text2);margin-right:auto}
+#timer{font-size:1.25rem;font-weight:700;font-variant-numeric:tabular-nums}
+#timer.u{color:var(--accent2);animation:blink .5s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+#tbar-bg{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden}
+#tbar{height:100%;background:var(--accent);border-radius:2px;transition:width 1s linear,background .3s}
+#tbar.u{background:var(--accent2)}
+
+#bwrap{border-radius:10px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,.55);position:relative}
+canvas{display:block;cursor:crosshair;max-width:min(624px,96vw);max-height:min(90vh,96vw)}
+
+#ctrls{display:flex;gap:10px}
+.cbtn{
+  padding:9px 18px;border-radius:var(--r);border:2px solid var(--surface2);
+  background:var(--surface);color:var(--text2);cursor:pointer;
+  font-size:.88rem;font-weight:500;transition:all .15s;
+}
+.cbtn:hover{border-color:var(--accent);color:var(--text)}
+#forbidden-msg{
+  font-size:.82rem;color:var(--accent2);min-height:1.2em;text-align:center;
+}
+
+/* ── MODAL ── */
+#modal{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.72);backdrop-filter:blur(6px);
+  align-items:center;justify-content:center;z-index:100;
+}
+#modal.show{display:flex}
+#mcard{
+  background:var(--surface);border-radius:20px;padding:40px 36px;
+  text-align:center;width:min(360px,90vw);
+  box-shadow:0 20px 60px rgba(0,0,0,.5);
+  animation:su .3s ease-out;
+}
+@keyframes su{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
+#mtitle{font-size:2.1rem;font-weight:800;margin-bottom:6px}
+#msub{color:var(--text2);margin-bottom:28px;font-size:.95rem}
+.mbtns{display:flex;gap:10px}
+.mbtns button{
+  flex:1;padding:13px;border-radius:var(--r);border:none;
+  font-size:.97rem;font-weight:600;cursor:pointer;transition:all .15s;
+}
+#btn-again{background:var(--accent);color:#fff}
+#btn-again:hover{background:#5751e0}
+#btn-menu{background:var(--surface2);color:var(--text)}
+#btn-menu:hover{background:#2c3247}
+</style>
+</head>
+<body>
+
+<!-- ═══ SETUP ═══ -->
+<div id="setup">
+  <h1>오목</h1>
+
+  <div>
+    <div class="lbl">선공 선택</div>
+    <div class="opts">
+      <button class="opt on" data-g="first" data-v="player">내가 먼저 ●흑</button>
+      <button class="opt"    data-g="first" data-v="ai">AI 먼저 ●흑</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="lbl">AI 난이도</div>
+    <div class="opts">
+      <button class="opt"    data-g="diff" data-v="easy">쉬움</button>
+      <button class="opt on" data-g="diff" data-v="medium">보통</button>
+      <button class="opt"    data-g="diff" data-v="hard">어려움</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="lbl">착수 제한 시간</div>
+    <div class="opts">
+      <button class="opt"    data-g="time" data-v="30">30초</button>
+      <button class="opt on" data-g="time" data-v="60">1분</button>
+      <button class="opt"    data-g="time" data-v="120">2분</button>
+    </div>
+  </div>
+
+  <button class="start" id="btn-start">게임 시작</button>
+</div>
+
+<!-- ═══ GAME ═══ -->
+<div id="game">
+  <div id="sbar">
+    <div id="turn-info">
+      <div class="si b" id="tstone"></div>
+      <span id="ttext">흑의 차례</span>
+    </div>
+    <div id="timer-wrap">
+      <div id="timer-row">
+        <span id="diff-badge"></span>
+        <span id="timer">1:00</span>
+      </div>
+      <div id="tbar-bg"><div id="tbar"></div></div>
+    </div>
+  </div>
+
+  <div id="bwrap"><canvas id="cv"></canvas></div>
+
+  <div id="ctrls">
+    <button class="cbtn" id="btn-resign">기권</button>
+    <button class="cbtn" id="btn-newgame">새 게임</button>
+  </div>
+  <div id="forbidden-msg"></div>
+</div>
+
+<!-- ═══ MODAL ═══ -->
+<div id="modal">
+  <div id="mcard">
+    <div id="mtitle">승리!</div>
+    <div id="msub">5목을 완성했습니다</div>
+    <div class="mbtns">
+      <button id="btn-again">다시 대국</button>
+      <button id="btn-menu">메뉴로</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════
+const N = 19;
+const CELL = 32;
+const PAD = 24;
+const CS = (N - 1) * CELL + PAD * 2;  // canvas size
+const SR = 13;                          // stone radius
+const STARS = [[3,3],[3,9],[3,15],[9,3],[9,9],[9,15],[15,3],[15,9],[15,15]];
+const E=0, B=1, W=2;
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let cfg = { first:'player', diff:'medium', time:60 };
+
+let g = {};   // game state
+
+function newGameState(cfg) {
+  return {
+    board: Array.from({length:N}, () => new Uint8Array(N)),
+    turn: B,
+    pc: cfg.first==='player' ? B : W,   // player color
+    ac: cfg.first==='player' ? W : B,   // ai color
+    status: 'playing',   // 'playing' | 'over'
+    timeLeft: cfg.time,
+    timeLimit: cfg.time,
+    diff: cfg.diff,
+    timerID: null,
+    lastMove: null,
+    moves: 0,
+    aiThinking: false,
+  };
+}
+
+// ═══════════════════════════════════════════════
+// SETUP SCREEN
+// ═══════════════════════════════════════════════
+document.querySelectorAll('.opt').forEach(b => {
+  b.addEventListener('click', () => {
+    const grp = b.dataset.g;
+    document.querySelectorAll(`.opt[data-g="${grp}"]`).forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    const val = b.dataset.v;
+    cfg[grp] = isNaN(val) ? val : +val;
+  });
+});
+
+document.getElementById('btn-start').addEventListener('click', startGame);
+
+// ═══════════════════════════════════════════════
+// CANVAS
+// ═══════════════════════════════════════════════
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+cv.width = cv.height = CS;
+cv.addEventListener('click', onCanvasClick);
+
+let hover = null;
+cv.addEventListener('mousemove', e => {
+  if (g.status !== 'playing' || g.aiThinking || g.turn !== g.pc) return;
+  const cell = hitCell(e);
+  const same = hover && cell && hover.r===cell.r && hover.c===cell.c;
+  if (!same) { hover = cell; draw(); }
+});
+cv.addEventListener('mouseleave', () => { hover=null; draw(); });
+
+function hitCell(e) {
+  const rect = cv.getBoundingClientRect();
+  const sx = cv.width / rect.width;
+  const sy = cv.height / rect.height;
+  const x = (e.clientX - rect.left) * sx;
+  const y = (e.clientY - rect.top)  * sy;
+  const c = Math.round((x - PAD) / CELL);
+  const r = Math.round((y - PAD) / CELL);
+  if (r<0||r>=N||c<0||c>=N) return null;
+  const dx = x-(PAD+c*CELL), dy = y-(PAD+r*CELL);
+  return dx*dx+dy*dy <= (CELL*.62)**2 ? {r,c} : null;
+}
+
+// ═══════════════════════════════════════════════
+// DRAW
+// ═══════════════════════════════════════════════
+function draw() {
+  // Board BG
+  ctx.fillStyle = '#c8a96e';
+  ctx.fillRect(0,0,CS,CS);
+
+  // Lines
+  ctx.strokeStyle = '#9a7520';
+  ctx.lineWidth = 1;
+  for (let i=0;i<N;i++){
+    const p = PAD+i*CELL;
+    ctx.beginPath();ctx.moveTo(p,PAD);ctx.lineTo(p,CS-PAD);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(PAD,p);ctx.lineTo(CS-PAD,p);ctx.stroke();
+  }
+
+  // Border
+  ctx.strokeStyle = '#7a5910';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(PAD,PAD,(N-1)*CELL,(N-1)*CELL);
+
+  // Star points
+  ctx.fillStyle = '#7a5910';
+  STARS.forEach(([r,c]) => {
+    ctx.beginPath();
+    ctx.arc(PAD+c*CELL, PAD+r*CELL, 3.5, 0, Math.PI*2);
+    ctx.fill();
+  });
+
+  // Coordinates
+  ctx.fillStyle='rgba(90,50,8,.55)';ctx.font='9px monospace';ctx.textAlign='center';
+  const COLS='ABCDEFGHJKLMNOPQRST';
+  for(let i=0;i<N;i++){
+    ctx.fillText(COLS[i], PAD+i*CELL, PAD-7);
+    ctx.textAlign='right';
+    ctx.fillText(N-i, PAD-6, PAD+i*CELL+4);
+    ctx.textAlign='center';
+  }
+
+  // Hover ghost
+  if (hover && g.board && g.board[hover.r][hover.c]===E) {
+    ctx.fillStyle = g.pc===B ? 'rgba(0,0,0,.28)' : 'rgba(255,255,255,.38)';
+    ctx.beginPath();
+    ctx.arc(PAD+hover.c*CELL, PAD+hover.r*CELL, SR, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  // Stones
+  if (g.board) {
+    for (let r=0;r<N;r++)
+      for (let c=0;c<N;c++)
+        if (g.board[r][c]!==E) drawStone(r,c,g.board[r][c]);
+  }
+
+  // Last move marker
+  if (g.lastMove) {
+    const {r,c} = g.lastMove;
+    ctx.strokeStyle = g.board[r][c]===B ? '#ff6b6b' : '#6c63ff';
+    ctx.lineWidth = 2;
+    const s=5, cx2=PAD+c*CELL, cy2=PAD+r*CELL;
+    ctx.strokeRect(cx2-s,cy2-s,s*2,s*2);
+  }
+}
+
+function drawStone(r,c,color){
+  const cx=PAD+c*CELL, cy=PAD+r*CELL;
+  ctx.beginPath();
+  ctx.arc(cx,cy,SR,0,Math.PI*2);
+  if(color===B){
+    const g2=ctx.createRadialGradient(cx-4,cy-4,1,cx,cy,SR);
+    g2.addColorStop(0,'#555');g2.addColorStop(1,'#111');
+    ctx.fillStyle=g2;
+  } else {
+    const g2=ctx.createRadialGradient(cx-4,cy-4,1,cx,cy,SR);
+    g2.addColorStop(0,'#fff');g2.addColorStop(1,'#ccc');
+    ctx.fillStyle=g2;
+    ctx.strokeStyle='#aaa';ctx.lineWidth=1;
+  }
+  ctx.fill();
+  if(color===W) ctx.stroke();
+}
+
+// ═══════════════════════════════════════════════
+// GAME INIT
+// ═══════════════════════════════════════════════
+function startGame() {
+  document.getElementById('setup').style.display='none';
+  document.getElementById('game').style.display='flex';
+  document.getElementById('modal').classList.remove('show');
+
+  if (g.timerID) clearInterval(g.timerID);
+  g = newGameState(cfg);
+  hover = null;
+
+  document.getElementById('diff-badge').textContent =
+    {easy:'쉬움',medium:'보통',hard:'어려움'}[g.diff];
+
+  draw();
+  updateSbar();
+  startTimer();
+
+  if (g.turn === g.ac) scheduleAI();
+}
+
+function goMenu() {
+  if (g.timerID) clearInterval(g.timerID);
+  document.getElementById('modal').classList.remove('show');
+  document.getElementById('game').style.display='none';
+  document.getElementById('setup').style.display='flex';
+}
+
+// ═══════════════════════════════════════════════
+// TIMER
+// ═══════════════════════════════════════════════
+function startTimer() {
+  clearInterval(g.timerID);
+  g.timeLeft = g.timeLimit;
+  renderTimer();
+  g.timerID = setInterval(() => {
+    g.timeLeft--;
+    renderTimer();
+    if (g.timeLeft <= 0) {
+      clearInterval(g.timerID);
+      onTimeout();
+    }
+  }, 1000);
+}
+
+function renderTimer() {
+  const el = document.getElementById('timer');
+  const bar = document.getElementById('tbar');
+  const pct = g.timeLeft / g.timeLimit * 100;
+  const m = Math.floor(g.timeLeft/60);
+  const s = g.timeLeft % 60;
+  el.textContent = `${m}:${String(s).padStart(2,'0')}`;
+  bar.style.width = pct + '%';
+  const u = g.timeLeft <= 10;
+  el.className = u ? 'u' : '';
+  bar.className = u ? 'u' : '';
+}
+
+function onTimeout() {
+  if (g.status !== 'playing') return;
+  const loser = g.turn;
+  const winner = loser===B ? W : B;
+  endGame(winner, 'timeout');
+}
+
+// ═══════════════════════════════════════════════
+// STATUS BAR
+// ═══════════════════════════════════════════════
+function updateSbar() {
+  const isPlayer = g.turn === g.pc;
+  const colorName = g.turn===B ? '흑●' : '백○';
+  document.getElementById('tstone').className = `si ${g.turn===B?'b':'w'}`;
+  document.getElementById('ttext').textContent =
+    `${colorName} ${isPlayer?'(나)':'(AI)'}의 차례`;
+}
+
+// ═══════════════════════════════════════════════
+// PLAYER INPUT
+// ═══════════════════════════════════════════════
+function onCanvasClick(e) {
+  if (g.status!=='playing' || g.turn!==g.pc || g.aiThinking) return;
+  const cell = hitCell(e);
+  if (!cell) return;
+  const {r,c} = cell;
+  if (g.board[r][c]!==E) return;
+
+  // Forbidden check for black
+  if (g.pc===B) {
+    const reason = getForbidden(r,c,B);
+    if (reason) { showMsg(`금수: ${reason} — 다른 곳을 선택하세요`, 2500); return; }
+  }
+  clearMsg();
+  place(r,c,g.pc);
+}
+
+function showMsg(txt, ms=0) {
+  const el=document.getElementById('forbidden-msg');
+  el.textContent=txt;
+  if (ms) setTimeout(clearMsg, ms);
+}
+function clearMsg(){ document.getElementById('forbidden-msg').textContent=''; }
+
+// ═══════════════════════════════════════════════
+// PLACE STONE
+// ═══════════════════════════════════════════════
+function place(r,c,color){
+  g.board[r][c] = color;
+  g.lastMove = {r,c};
+  g.moves++;
+  hover = null;
+  draw();
+
+  if (checkWin(r,c,color)) {
+    clearInterval(g.timerID);
+    g.status='over';
+    setTimeout(() => endGame(color,'win'), 320);
+    return;
+  }
+  if (g.moves === N*N) {
+    clearInterval(g.timerID);
+    g.status='over';
+    setTimeout(() => endGame(null,'draw'), 320);
+    return;
+  }
+
+  g.turn = color===B ? W : B;
+  updateSbar();
+  startTimer();
+
+  if (g.turn === g.ac) scheduleAI();
+}
+
+// ═══════════════════════════════════════════════
+// WIN CHECK
+// ═══════════════════════════════════════════════
+function checkWin(r,c,color){
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  for(const [dr,dc] of dirs){
+    let n=1;
+    for(let i=1;i<9;i++){const nr=r+dr*i,nc=c+dc*i;if(nr<0||nr>=N||nc<0||nc>=N||g.board[nr][nc]!==color)break;n++;}
+    for(let i=1;i<9;i++){const nr=r-dr*i,nc=c-dc*i;if(nr<0||nr>=N||nc<0||nc>=N||g.board[nr][nc]!==color)break;n++;}
+    if(color===B && n===5) return true;
+    if(color===W && n>=5)  return true;
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════
+// FORBIDDEN MOVES (BLACK / Renju rules)
+// ═══════════════════════════════════════════════
+function getForbidden(r,c,color){
+  if(color!==B) return null;
+  g.board[r][c]=color;
+  let reason=null;
+  if(hasOverline(r,c,color))           reason='장목(6목이상)';
+  else if(countFours(r,c,color)>=2)    reason='사사(쌍사)';
+  else if(countOpenThrees(r,c,color)>=2) reason='삼삼(쌍삼)';
+  g.board[r][c]=E;
+  return reason;
+}
+
+function lineCount(r,c,dr,dc,color){
+  let n=1;
+  for(let i=1;i<9;i++){const nr=r+dr*i,nc=c+dc*i;if(nr<0||nr>=N||nc<0||nc>=N||g.board[nr][nc]!==color)break;n++;}
+  for(let i=1;i<9;i++){const nr=r-dr*i,nc=c-dc*i;if(nr<0||nr>=N||nc<0||nc>=N||g.board[nr][nc]!==color)break;n++;}
+  return n;
+}
+
+function hasOverline(r,c,color){
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  for(const [dr,dc] of dirs) if(lineCount(r,c,dr,dc,color)>=6) return true;
+  return false;
+}
+
+function countFours(r,c,color){
+  // Count directions that have exactly 4 consecutive stones
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  let n=0;
+  for(const [dr,dc] of dirs) if(lineCount(r,c,dr,dc,color)===4) n++;
+  return n;
+}
+
+function countOpenThrees(r,c,color){
+  // Count directions where placing creates an open-three (_XXX_ pattern)
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  let n=0;
+  for(const [dr,dc] of dirs){
+    if(isOpenThreeDir(r,c,dr,dc,color)) n++;
+  }
+  return n;
+}
+
+function isOpenThreeDir(r,c,dr,dc,color){
+  // Collect 9-cell window around (r,c) in direction (dr,dc)
+  // Value: 1=color, 0=empty, -1=wall/opponent
+  const line=[];
+  for(let i=-4;i<=4;i++){
+    const nr=r+dr*i, nc=c+dc*i;
+    if(nr<0||nr>=N||nc<0||nc>=N) line.push(-1);
+    else if(g.board[nr][nc]===color) line.push(1);
+    else if(g.board[nr][nc]===E)    line.push(0);
+    else                            line.push(-1);
+  }
+  // center is index 4; look for _XXX_ pattern of exactly length 3 including center
+  // Check each possible consecutive run of 3 that includes index 4
+  for(let start=1;start<=4;start++){
+    const end=start+2;
+    if(end>=8) continue;
+    // Must include index 4
+    if(start>4||end<4) continue;
+    // Check all 3 cells are color (1)
+    if(line[start]!==1||line[start+1]!==1||line[start+2]!==1) continue;
+    // Check borders: cell before and after window must be empty (0)
+    const before = start>0 ? line[start-1] : -1;
+    const after  = end<8  ? line[end+1]   : -1;
+    if(before===0 && after===0) return true;
+  }
+  return false;
+}
+
+// ═══════════════════════════════════════════════
+// AI
+// ═══════════════════════════════════════════════
+function scheduleAI(){
+  g.aiThinking=true;
+  const delay = 300+Math.random()*250;
+  setTimeout(()=>{
+    if(g.status!=='playing'){g.aiThinking=false;return;}
+    const mv=aiMove();
+    g.aiThinking=false;
+    if(mv) place(mv.r,mv.c,g.ac);
+  }, delay);
+}
+
+function aiMove(){
+  const {ac,diff} = g;
+  const pc = ac===B?W:B;
+  if(diff==='easy')   return aiEasy(ac);
+  if(diff==='medium') return aiMedium(ac,pc);
+  return aiHard(ac,pc);
+}
+
+// Candidate cells near existing stones
+function candidates(radius=2){
+  if(g.moves===0) return [{r:9,c:9}];
+  const seen=new Set(), res=[];
+  for(let r=0;r<N;r++) for(let c=0;c<N;c++){
+    if(g.board[r][c]===E) continue;
+    for(let dr=-radius;dr<=radius;dr++) for(let dc=-radius;dc<=radius;dc++){
+      const nr=r+dr, nc=c+dc;
+      if(nr<0||nr>=N||nc<0||nc>=N||g.board[nr][nc]!==E) continue;
+      const k=nr*N+nc;
+      if(!seen.has(k)){seen.add(k);res.push({r:nr,c:nc});}
+    }
+  }
+  return res.length?res:[{r:9,c:9}];
+}
+
+function validMove(r,c,color){
+  if(g.board[r][c]!==E) return false;
+  if(color===B && getForbidden(r,c,color)) return false;
+  return true;
+}
+
+// ── EASY ──
+function aiEasy(color){
+  const cands=candidates(1).filter(({r,c})=>validMove(r,c,color));
+  if(!cands.length) return null;
+  return cands[Math.floor(Math.random()*cands.length)];
+}
+
+// ── MEDIUM ──
+function aiMedium(ac,pc){
+  const cands=candidates(2);
+  // 1. Win
+  for(const {r,c} of cands){
+    if(!validMove(r,c,ac)) continue;
+    g.board[r][c]=ac;
+    if(checkWin(r,c,ac)){g.board[r][c]=E;return{r,c};}
+    g.board[r][c]=E;
+  }
+  // 2. Block player win
+  for(const {r,c} of cands){
+    if(!validMove(r,c,pc)) continue;
+    g.board[r][c]=pc;
+    if(checkWin(r,c,pc)){g.board[r][c]=E;return{r,c};}
+    g.board[r][c]=E;
+  }
+  // 3. Score
+  let best=null,bestS=-Infinity;
+  for(const {r,c} of cands){
+    if(!validMove(r,c,ac)) continue;
+    const s=score(r,c,ac)*1.2+score(r,c,pc);
+    if(s>bestS){bestS=s;best={r,c};}
+  }
+  return best;
+}
+
+// ── HARD ──
+function aiHard(ac,pc){
+  const cands=candidates(2);
+  // 1. Win
+  for(const {r,c} of cands){
+    if(!validMove(r,c,ac)) continue;
+    g.board[r][c]=ac;
+    if(checkWin(r,c,ac)){g.board[r][c]=E;return{r,c};}
+    g.board[r][c]=E;
+  }
+  // 2. Block win
+  for(const {r,c} of cands){
+    if(!validMove(r,c,pc)) continue;
+    g.board[r][c]=pc;
+    if(checkWin(r,c,pc)){g.board[r][c]=E;return{r,c};}
+    g.board[r][c]=E;
+  }
+  // 3. Create open-4
+  for(const {r,c} of cands){
+    if(!validMove(r,c,ac)) continue;
+    g.board[r][c]=ac;
+    if(openFours(r,c,ac)>=1){g.board[r][c]=E;return{r,c};}
+    g.board[r][c]=E;
+  }
+  // 4. Block player's open-4
+  for(const {r,c} of cands){
+    if(!validMove(r,c,pc)) continue;
+    g.board[r][c]=pc;
+    if(openFours(r,c,pc)>=1){g.board[r][c]=E;return{r,c};}
+    g.board[r][c]=E;
+  }
+  // 5. Score
+  let best=null,bestS=-Infinity;
+  for(const {r,c} of cands){
+    if(!validMove(r,c,ac)) continue;
+    const s=score(r,c,ac)*1.35+score(r,c,pc)+centerBonus(r,c);
+    if(s>bestS){bestS=s;best={r,c};}
+  }
+  return best;
+}
+
+function openFours(r,c,color){
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  let n=0;
+  for(const [dr,dc] of dirs){
+    let cnt=1, openE=0;
+    for(let i=1;i<=4;i++){const nr=r+dr*i,nc=c+dc*i;if(nr<0||nr>=N||nc<0||nc>=N)break;if(g.board[nr][nc]===color)cnt++;else{if(g.board[nr][nc]===E)openE++;break;}}
+    for(let i=1;i<=4;i++){const nr=r-dr*i,nc=c-dc*i;if(nr<0||nr>=N||nc<0||nc>=N)break;if(g.board[nr][nc]===color)cnt++;else{if(g.board[nr][nc]===E)openE++;break;}}
+    if(cnt===4&&openE>=1) n++;
+  }
+  return n;
+}
+
+function score(r,c,color){
+  g.board[r][c]=color;
+  let s=0;
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  for(const [dr,dc] of dirs){
+    const {cnt,open}=lineInfo(r,c,dr,dc,color);
+    if(cnt>=5)         s+=100000;
+    else if(cnt===4&&open===2) s+=50000;
+    else if(cnt===4&&open===1) s+=10000;
+    else if(cnt===3&&open===2) s+=2000;
+    else if(cnt===3&&open===1) s+=500;
+    else if(cnt===2&&open===2) s+=150;
+    else if(cnt===2&&open===1) s+=50;
+  }
+  g.board[r][c]=E;
+  return s;
+}
+
+function lineInfo(r,c,dr,dc,color){
+  let cnt=1, open=0;
+  for(let i=1;i<=4;i++){const nr=r+dr*i,nc=c+dc*i;if(nr<0||nr>=N||nc<0||nc>=N)break;if(g.board[nr][nc]===color)cnt++;else{if(g.board[nr][nc]===E)open++;break;}}
+  for(let i=1;i<=4;i++){const nr=r-dr*i,nc=c-dc*i;if(nr<0||nr>=N||nc<0||nc>=N)break;if(g.board[nr][nc]===color)cnt++;else{if(g.board[nr][nc]===E)open++;break;}}
+  return {cnt, open};
+}
+
+function centerBonus(r,c){
+  const h=(N-1)/2;
+  return 10-Math.sqrt((r-h)**2+(c-h)**2);
+}
+
+// ═══════════════════════════════════════════════
+// GAME OVER
+// ═══════════════════════════════════════════════
+function endGame(winner, reason){
+  g.status='over';
+  const title=document.getElementById('mtitle');
+  const sub=document.getElementById('msub');
+
+  if(reason==='draw'){
+    title.textContent='무승부'; title.style.color='#8892a4';
+    sub.textContent='보드가 가득 찼습니다';
+  } else if(reason==='timeout'){
+    const playerLost = winner!==g.pc;
+    title.textContent = playerLost ? '시간 초과' : 'AI 시간 초과';
+    title.style.color = playerLost ? '#ff6b6b' : '#6c63ff';
+    sub.textContent = playerLost ? '제한 시간을 초과했습니다' : 'AI가 시간 초과되었습니다';
+  } else if(reason==='resign'){
+    title.textContent='기권패'; title.style.color='#ff6b6b';
+    sub.textContent='게임을 포기했습니다';
+  } else {
+    const playerWon = winner===g.pc;
+    title.textContent = playerWon ? '승리!' : '패배';
+    title.style.color = playerWon ? '#6c63ff' : '#ff6b6b';
+    sub.textContent = playerWon
+      ? `${winner===B?'흑(●)':'백(○)'}으로 5목을 완성했습니다!`
+      : `AI가 5목을 완성했습니다`;
+  }
+  document.getElementById('modal').classList.add('show');
+}
+
+// ═══════════════════════════════════════════════
+// CONTROLS
+// ═══════════════════════════════════════════════
+document.getElementById('btn-resign').addEventListener('click', ()=>{
+  if(g.status!=='playing') return;
+  clearInterval(g.timerID);
+  endGame(g.ac,'resign');
+});
+
+document.getElementById('btn-newgame').addEventListener('click', ()=>{
+  if(g.status==='playing'){
+    if(!confirm('진행 중인 게임을 종료하고 새 게임을 시작할까요?')) return;
+  }
+  startGame();
+});
+
+document.getElementById('btn-again').addEventListener('click', ()=>{
+  document.getElementById('modal').classList.remove('show');
+  startGame();
+});
+
+document.getElementById('btn-menu').addEventListener('click', goMenu);
+
+// ═══════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════
+draw();
+</script>
+</body>
+</html>
